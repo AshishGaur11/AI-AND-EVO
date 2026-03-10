@@ -1,0 +1,123 @@
+Code Snippets for Each Stage
+1️⃣ Simple ANN (PyTorch)import torch
+import torch.nn as nn
+
+class SimpleANN(nn.Module):
+    def __init__(self, input_dim=784, hidden_dim=128, output_dim=10):
+        super().__init__()
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(hidden_dim, output_dim)
+
+    def forward(self, x):
+        x = x.view(x.size(0), -1)          # flatten
+        x = self.relu(self.fc1(x))
+        return self.fc2(x)
+
+# Example usage
+model = SimpleANN()
+logits = model(torch.randn(32, 1, 28, 28))   # batch of 32 MNIST images
+
+2️⃣ Basic CNN (Keras)
+from tensorflow.keras import layers, models
+
+def build_cnn(input_shape=(32, 32, 3), num_classes=10):
+    model = models.Sequential([
+        layers.Conv2D(32, (3,3), activation='relu', input_shape=input_shape),
+        layers.MaxPooling2D((2,2)),
+        layers.Conv2D(64, (3,3), activation='relu'),
+        layers.MaxPooling2D((2,2)),
+        layers.Flatten(),
+        layers.Dense(128, activation='relu'),
+        layers.Dense(num_classes, activation='softmax')
+    ])
+    return model
+
+# Example usage
+cnn = build_cnn()
+cnn.compile(optimizer='adam', loss='sparse_categorical_crossentropy',
+            metrics=['accuracy'])
+
+
+Simple RNN (TensorFlow)
+
+import tensorflow as tf
+
+model = tf.keras.Sequential([
+    tf.keras.layers.SimpleRNN(64, activation='tanh', input_shape=(None, 100)),
+    tf.keras.layers.Dense(10, activation='softmax')
+])
+
+model.compile(optimizer='adam', loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+
+4️⃣ Minimal Transformer Block (PyTorch)
+import torch
+import torch.nn as nn
+import math
+
+class MiniTransformer(nn.Module):
+    def __init__(self, d_model=64, nhead=8, dim_feedforward=256):
+        super().__init__()
+        self.self_attn = nn.MultiheadAttention(d_model, nhead)
+        self.linear1 = nn.Linear(d_model, dim_feedforward)
+        self.dropout = nn.Dropout(0.1)
+        self.linear2 = nn.Linear(dim_feedforward, d_model)
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+
+    def forward(self, src):
+        # src shape: (seq_len, batch, d_model)
+        attn_output, _ = self.self_attn(src, src, src)
+        src = self.norm1(src + attn_output)
+        ff_output = self.linear2(self.dropout(torch.relu(self.linear1(src))))
+        src = self.norm2(src + ff_output)
+        return src
+
+# Example usage
+x = torch.randn(10, 32, 64)   # seq_len=10, batch=32, d_model=64
+transformer = MiniTransformer()
+out = transformer(x)
+
+5️⃣ Diffusion Model Core Loop (PyTorch)
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class SimpleDiffusion(nn.Module):
+    def __init__(self, img_channels=3, timesteps=1000):
+        super().__init__()
+        self.timesteps = timesteps
+        self.net = nn.Sequential(
+            nn.Conv2d(img_channels, 64, 3, padding=1), nn.ReLU(),
+            nn.Conv2d(64, 64, 3, padding=1), nn.ReLU(),
+            nn.Conv2d(64, img_channels, 3, padding=1)
+        )
+        # Linear schedule for betas
+        self.betas = torch.linspace(1e-4, 0.02, timesteps)
+
+    def q_sample(self, x_start, t, noise=None):
+        """Forward diffusion (adding noise)"""
+        if noise is None:
+            noise = torch.randn_like(x_start)
+        sqrt_alpha_bar = torch.sqrt(torch.cumprod(1 - self.betas, dim=0))[t]
+        sqrt_one_minus_alpha_bar = torch.sqrt(1 - torch.cumprod(1 - self.betas, dim=0)[t])
+        return sqrt_alpha_bar * x_start + sqrt_one_minus_alpha_bar * noise
+
+    def forward(self, x, t):
+        """Predict noise given a noisy image at timestep t"""
+        return self.net(x)
+
+# Example usage (single training step)
+model = SimpleDiffusion()
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+
+x0 = torch.randn(16, 3, 32, 32)          # batch of clean images
+t = torch.randint(0, model.timesteps, (16,))  # random timesteps
+noise = torch.randn_like(x0)
+x_t = model.q_sample(x0, t, noise)   # noisy image
+pred_noise = model(x_t, t)           # model prediction
+loss = F.mse_loss(pred_noise, noise) # training objective
+loss.backward()
+optimizer.step()
